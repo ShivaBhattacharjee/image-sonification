@@ -35,6 +35,13 @@ import {
   IconPlayerPause,
 } from "@tabler/icons-react";
 import { useTheme } from "@/components/theme-provider";
+import {
+  imageToAudio,
+  audioToImage,
+  formatBytes,
+  formatDuration,
+  type QualityMode,
+} from "@/services/sonification";
 
 type Mode = "image-to-wav" | "wav-to-image";
 
@@ -46,6 +53,14 @@ export function ImageSonification() {
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [audioUrl, setAudioUrl] = React.useState<string | null>(null);
   const [isPlaying, setIsPlaying] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [quality, setQuality] = React.useState<QualityMode>("compressed");
+  const [resultInfo, setResultInfo] = React.useState<{
+    size?: string;
+    duration?: string;
+    dimensions?: string;
+    compressionRatio?: string;
+  } | null>(null);
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const { theme, setTheme } = useTheme();
 
@@ -104,13 +119,38 @@ export function ImageSonification() {
   };
 
   const handleProcess = async () => {
-    if (!uploadedFile) return;
+    if (!uploadedFile) return
 
-    setIsProcessing(true);
-    // TODO: Replace with actual backend call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setResultUrl(URL.createObjectURL(uploadedFile));
-    setIsProcessing(false);
+    setIsProcessing(true)
+    setError(null)
+    setResultInfo(null)
+
+    try {
+      if (mode === "image-to-wav") {
+        const result = await imageToAudio(uploadedFile, { quality })
+        setResultUrl(result.audioUrl)
+        setResultInfo({
+          size: formatBytes(result.audioBlob.size),
+          duration: formatDuration(result.duration),
+          compressionRatio: result.compressionRatio && result.compressionRatio > 1
+            ? `${result.compressionRatio.toFixed(1)}x`
+            : undefined,
+        })
+      } else {
+        const result = await audioToImage(uploadedFile)
+        setResultUrl(result.imageUrl)
+        setResultInfo({
+          dimensions: `${result.width} x ${result.height}`,
+          size: formatBytes(result.imageBlob.size),
+        })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Processing failed"
+      setError(message)
+      console.error("Processing error:", err)
+    } finally {
+      setIsProcessing(false)
+    }
   };
 
   const handleDownload = () => {
@@ -128,11 +168,13 @@ export function ImageSonification() {
   };
 
   const handleReset = () => {
-    setUploadedFile(null);
-    setResultUrl(null);
-    setPreviewUrl(null);
-    setAudioUrl(null);
-    setIsPlaying(false);
+    setUploadedFile(null)
+    setResultUrl(null)
+    setPreviewUrl(null)
+    setAudioUrl(null)
+    setIsPlaying(false)
+    setError(null)
+    setResultInfo(null)
   };
 
   const handleModeChange = (value: string) => {
@@ -250,6 +292,11 @@ export function ImageSonification() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {error && (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
                 {!uploadedFile ? (
                   <ImageUploader mode="image-to-wav" onFileChange={handleFileChange} />
                 ) : (
@@ -259,6 +306,9 @@ export function ImageSonification() {
                     mode="image-to-wav"
                     isProcessing={isProcessing}
                     resultUrl={resultUrl}
+                    resultInfo={resultInfo}
+                    quality={quality}
+                    onQualityChange={setQuality}
                     onReset={handleReset}
                     onProcess={handleProcess}
                     onDownload={handleDownload}
@@ -295,6 +345,11 @@ export function ImageSonification() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {error && (
+                  <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
                 {!uploadedFile ? (
                   <ImageUploader mode="wav-to-image" onFileChange={handleFileChange} />
                 ) : (
@@ -589,18 +644,24 @@ function UploadedFileView({
   mode,
   isProcessing,
   resultUrl,
+  resultInfo,
+  quality,
+  onQualityChange,
   onReset,
   onProcess,
   onDownload,
 }: {
-  file: File;
-  previewUrl: string | null;
-  mode: Mode;
-  isProcessing: boolean;
-  resultUrl: string | null;
-  onReset: () => void;
-  onProcess: () => void;
-  onDownload: () => void;
+  file: File
+  previewUrl: string | null
+  mode: Mode
+  isProcessing: boolean
+  resultUrl: string | null
+  resultInfo: { size?: string; duration?: string; dimensions?: string; compressionRatio?: string } | null
+  quality?: QualityMode
+  onQualityChange?: (quality: QualityMode) => void
+  onReset: () => void
+  onProcess: () => void
+  onDownload: () => void
 }) {
   const resultAudioRef = React.useRef<HTMLAudioElement>(null);
   const [isResultPlaying, setIsResultPlaying] = React.useState(false);
@@ -663,6 +724,43 @@ function UploadedFileView({
         </div>
       </div>
 
+      {/* Quality Selector (only for image-to-wav) */}
+      {mode === "image-to-wav" && !resultUrl && quality && onQualityChange && (
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <p className="mb-3 text-sm font-medium">Output Mode</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onQualityChange("compressed")}
+              className={`rounded-lg border p-3 text-left transition-all ${
+                quality === "compressed"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              <p className="font-medium text-sm">Compact</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                JPEG, ~100KB-1MB
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => onQualityChange("full")}
+              className={`rounded-lg border p-3 text-left transition-all ${
+                quality === "full"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              <p className="font-medium text-sm">Lossless</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                PNG quality, larger
+              </p>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Process Button */}
       {!resultUrl && (
         <Button
@@ -696,12 +794,19 @@ function UploadedFileView({
                   <IconPhoto className="h-5 w-5 text-primary" />
                 )}
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-medium text-primary">Conversion Complete</p>
                 <p className="text-sm text-muted-foreground">
-                  Your {mode === "image-to-wav" ? "audio" : "image"} file is
-                  ready
+                  Your {mode === "image-to-wav" ? "audio" : "image"} file is ready
                 </p>
+                {resultInfo && (
+                  <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                    {resultInfo.size && <span>Size: {resultInfo.size}</span>}
+                    {resultInfo.duration && <span>Duration: {resultInfo.duration}</span>}
+                    {resultInfo.dimensions && <span>Dimensions: {resultInfo.dimensions}</span>}
+                    {resultInfo.compressionRatio && <span>Compression: {resultInfo.compressionRatio}</span>}
+                  </div>
+                )}
               </div>
             </div>
           </div>
