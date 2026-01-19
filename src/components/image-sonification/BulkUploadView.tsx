@@ -108,27 +108,31 @@ export function BulkUploadView({
             className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30"
           >
             {pf.previewUrl && (
-              <div className="relative group shrink-0">
+              <div 
+                className="relative group shrink-0 cursor-pointer"
+                onClick={() => handleImageClick(pf.previewUrl!, pf.file.name)}
+              >
                 <img
                   src={pf.previewUrl}
                   alt={pf.file.name}
-                  className="h-10 w-10 rounded object-cover cursor-pointer"
-                  onClick={() => handleImageClick(pf.previewUrl!, pf.file.name)}
+                  className="h-10 w-10 rounded object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded cursor-pointer">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded pointer-events-none">
                   <IconZoomIn className="h-5 w-5 text-white" />
                 </div>
               </div>
             )}
             {pf.status === "completed" && pf.resultUrl && !isImageToWav && (
-              <div className="relative group shrink-0">
+              <div 
+                className="relative group shrink-0 cursor-pointer"
+                onClick={() => handleImageClick(pf.resultUrl, pf.file.name)}
+              >
                 <img
                   src={pf.resultUrl}
                   alt={pf.file.name}
-                  className="h-10 w-10 rounded object-cover cursor-pointer"
-                  onClick={() => handleImageClick(pf.resultUrl, pf.file.name)}
+                  className="h-10 w-10 rounded object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded cursor-pointer">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded pointer-events-none">
                   <IconZoomIn className="h-5 w-5 text-white" />
                 </div>
               </div>
