@@ -33,6 +33,8 @@ import {
   IconBrandGithub,
   IconPlayerPlay,
   IconPlayerPause,
+  IconShare,
+  IconBrandX,
 } from "@tabler/icons-react";
 import { useTheme } from "@/components/theme-provider";
 import {
@@ -45,22 +47,54 @@ import {
 
 type Mode = "image-to-wav" | "wav-to-image";
 
+interface ModeState {
+  uploadedFile: File | null
+  resultUrl: string | null
+  resultBlob: Blob | null
+  previewUrl: string | null
+  audioUrl: string | null
+  isProcessing: boolean
+  error: string | null
+  resultInfo: {
+    size?: string
+    duration?: string
+    dimensions?: string
+    compressionRatio?: string
+  } | null
+}
+
 export function ImageSonification() {
   const [mode, setMode] = React.useState<Mode>("image-to-wav");
-  const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
-  const [resultUrl, setResultUrl] = React.useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
-  const [audioUrl, setAudioUrl] = React.useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const [quality, setQuality] = React.useState<QualityMode>("compressed");
-  const [resultInfo, setResultInfo] = React.useState<{
-    size?: string;
-    duration?: string;
-    dimensions?: string;
-    compressionRatio?: string;
-  } | null>(null);
+  
+  // Separate state for each mode
+  const [imageToWavState, setImageToWavState] = React.useState<ModeState>({
+    uploadedFile: null,
+    resultUrl: null,
+    resultBlob: null,
+    previewUrl: null,
+    audioUrl: null,
+    isProcessing: false,
+    error: null,
+    resultInfo: null,
+  })
+  
+  const [wavToImageState, setWavToImageState] = React.useState<ModeState>({
+    uploadedFile: null,
+    resultUrl: null,
+    resultBlob: null,
+    previewUrl: null,
+    audioUrl: null,
+    isProcessing: false,
+    error: null,
+    resultInfo: null,
+  })
+  
+  // Current state based on mode
+  const currentState = mode === "image-to-wav" ? imageToWavState : wavToImageState
+  const setCurrentState = mode === "image-to-wav" ? setImageToWavState : setWavToImageState
+  
+  const [isPlaying, setIsPlaying] = React.useState(false);
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const { theme, setTheme } = useTheme();
 
@@ -100,86 +134,134 @@ export function ImageSonification() {
   const handleFileChange = (files: File[]) => {
     if (files.length > 0) {
       const file = files[0];
-      setUploadedFile(file);
-      setResultUrl(null);
-
-      if (file.type.startsWith("image/")) {
-        const url = URL.createObjectURL(file);
-        setPreviewUrl(url);
-        setAudioUrl(null);
-      } else if (file.type.startsWith("audio/") || file.name.endsWith(".wav")) {
-        const url = URL.createObjectURL(file);
-        setAudioUrl(url);
-        setPreviewUrl(null);
-      } else {
-        setPreviewUrl(null);
-        setAudioUrl(null);
-      }
+      
+      setCurrentState(prev => ({
+        ...prev,
+        uploadedFile: file,
+        resultUrl: null,
+        resultBlob: null,
+        error: null,
+        resultInfo: null,
+        previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+        audioUrl: (file.type.startsWith("audio/") || file.name.endsWith(".wav")) ? URL.createObjectURL(file) : null,
+      }))
     }
   };
 
   const handleProcess = async () => {
-    if (!uploadedFile) return
+    if (!currentState.uploadedFile) return
 
-    setIsProcessing(true)
-    setError(null)
-    setResultInfo(null)
+    setCurrentState(prev => ({ ...prev, isProcessing: true, error: null, resultInfo: null, resultBlob: null }))
 
     try {
       if (mode === "image-to-wav") {
-        const result = await imageToAudio(uploadedFile, { quality })
-        setResultUrl(result.audioUrl)
-        setResultInfo({
-          size: formatBytes(result.audioBlob.size),
-          duration: formatDuration(result.duration),
-          compressionRatio: result.compressionRatio && result.compressionRatio > 1
-            ? `${result.compressionRatio.toFixed(1)}x`
-            : undefined,
-        })
+        const result = await imageToAudio(currentState.uploadedFile, { quality })
+        setCurrentState(prev => ({
+          ...prev,
+          resultUrl: result.audioUrl,
+          resultBlob: result.audioBlob,
+          resultInfo: {
+            size: formatBytes(result.audioBlob.size),
+            duration: formatDuration(result.duration),
+            compressionRatio: result.compressionRatio && result.compressionRatio > 1
+              ? `${result.compressionRatio.toFixed(1)}x`
+              : undefined,
+          },
+          isProcessing: false,
+        }))
       } else {
-        const result = await audioToImage(uploadedFile)
-        setResultUrl(result.imageUrl)
-        setResultInfo({
-          dimensions: `${result.width} x ${result.height}`,
-          size: formatBytes(result.imageBlob.size),
-        })
+        const result = await audioToImage(currentState.uploadedFile)
+        setCurrentState(prev => ({
+          ...prev,
+          resultUrl: result.imageUrl,
+          resultBlob: result.imageBlob,
+          resultInfo: {
+            dimensions: `${result.width} x ${result.height}`,
+            size: formatBytes(result.imageBlob.size),
+          },
+          isProcessing: false,
+        }))
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Processing failed"
-      setError(message)
+      setCurrentState(prev => ({ ...prev, error: message, isProcessing: false }))
       console.error("Processing error:", err)
-    } finally {
-      setIsProcessing(false)
     }
   };
 
   const handleDownload = () => {
-    if (!resultUrl) return;
+    if (!currentState.resultUrl) return;
 
     const link = document.createElement("a");
-    link.href = resultUrl;
+    link.href = currentState.resultUrl;
     link.download =
       mode === "image-to-wav"
-        ? `${uploadedFile?.name.split(".")[0] || "sonified"}.wav`
-        : `${uploadedFile?.name.split(".")[0] || "reconstructed"}.png`;
+        ? `${currentState.uploadedFile?.name.split(".")[0] || "sonified"}.wav`
+        : `${currentState.uploadedFile?.name.split(".")[0] || "reconstructed"}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const handleShare = async () => {
+    if (!currentState.resultBlob || !currentState.uploadedFile) return
+
+    const fileName = mode === "image-to-wav"
+      ? `${currentState.uploadedFile.name.split(".")[0] || "sonified"}.wav`
+      : `${currentState.uploadedFile.name.split(".")[0] || "reconstructed"}.png`
+
+    const fileToShare = new File(
+      [currentState.resultBlob],
+      fileName,
+      { type: currentState.resultBlob.type }
+    )
+
+    if (navigator.share && navigator.canShare({ files: [fileToShare] })) {
+      try {
+        await navigator.share({
+          title: "Image Sonification",
+          text: mode === "image-to-wav"
+            ? "Check out this image converted to sound!"
+            : "Check out this image reconstructed from sound!",
+          files: [fileToShare],
+        })
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Share failed:", err)
+        }
+      }
+    } else {
+      alert("Sharing is not supported on this device. Please use the download button.")
+    }
+  }
+
+  const handleShareToTwitter = () => {
+    const text = mode === "image-to-wav"
+      ? "Just converted an image to sound using Image Sonification! 🎵🖼️"
+      : "Just reconstructed an image from sound using Image Sonification! 🖼️🎵"
+    const url = "https://sonification.shiva.codes"
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
+    window.open(tweetUrl, "_blank", "noopener,noreferrer")
+  };
+
   const handleReset = () => {
-    setUploadedFile(null)
-    setResultUrl(null)
-    setPreviewUrl(null)
-    setAudioUrl(null)
+    setCurrentState({
+      uploadedFile: null,
+      resultUrl: null,
+      resultBlob: null,
+      previewUrl: null,
+      audioUrl: null,
+      isProcessing: false,
+      error: null,
+      resultInfo: null,
+    })
     setIsPlaying(false)
-    setError(null)
-    setResultInfo(null)
   };
 
   const handleModeChange = (value: string) => {
     setMode(value as Mode);
-    handleReset();
+    setIsPlaying(false);
+    // Don't reset - preserve state for each mode
   };
 
   const togglePlayPause = () => {
@@ -292,21 +374,22 @@ export function ImageSonification() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {error && (
+                {currentState.error && (
                   <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                    <p className="text-sm text-destructive">{error}</p>
+                    <p className="text-sm text-destructive">{currentState.error}</p>
                   </div>
                 )}
-                {!uploadedFile ? (
+                {!currentState.uploadedFile ? (
                   <ImageUploader mode="image-to-wav" onFileChange={handleFileChange} />
                 ) : (
                   <UploadedFileView
-                    file={uploadedFile}
-                    previewUrl={previewUrl}
+                    file={currentState.uploadedFile}
+                    previewUrl={currentState.previewUrl}
                     mode="image-to-wav"
-                    isProcessing={isProcessing}
-                    resultUrl={resultUrl}
-                    resultInfo={resultInfo}
+                    isProcessing={currentState.isProcessing}
+                    resultUrl={currentState.resultUrl}
+                    resultBlob={currentState.resultBlob}
+                    resultInfo={currentState.resultInfo}
                     quality={quality}
                     onQualityChange={setQuality}
                     onReset={handleReset}
@@ -345,17 +428,17 @@ export function ImageSonification() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {error && (
+                {currentState.error && (
                   <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                    <p className="text-sm text-destructive">{error}</p>
+                    <p className="text-sm text-destructive">{currentState.error}</p>
                   </div>
                 )}
-                {!uploadedFile ? (
+                {!currentState.uploadedFile ? (
                   <ImageUploader mode="wav-to-image" onFileChange={handleFileChange} />
                 ) : (
                   <div className="space-y-4">
                     {/* Audio Player for WAV input */}
-                    {audioUrl && (
+                    {currentState.audioUrl && (
                       <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 min-w-0">
@@ -364,10 +447,10 @@ export function ImageSonification() {
                             </div>
                             <div className="min-w-0">
                               <p className="truncate font-medium">
-                                {uploadedFile.name}
+                                {currentState.uploadedFile.name}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {(uploadedFile.size / (1024 * 1024)).toFixed(2)} MB
+                                {(currentState.uploadedFile.size / (1024 * 1024)).toFixed(2)} MB
                               </p>
                             </div>
                           </div>
@@ -424,7 +507,7 @@ export function ImageSonification() {
 
                         <audio
                           ref={audioRef}
-                          src={audioUrl}
+                          src={currentState.audioUrl}
                           onEnded={() => setIsPlaying(false)}
                           className="hidden"
                           crossOrigin="anonymous"
@@ -433,14 +516,14 @@ export function ImageSonification() {
                     )}
 
                     {/* Process Button */}
-                    {!resultUrl && (
+                    {!currentState.resultUrl && (
                       <Button
                         className="w-full"
                         size="lg"
                         onClick={handleProcess}
-                        disabled={isProcessing}
+                        disabled={currentState.isProcessing}
                       >
-                        {isProcessing ? (
+                        {currentState.isProcessing ? (
                           <>
                             <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                             Processing...
@@ -452,7 +535,7 @@ export function ImageSonification() {
                     )}
 
                     {/* Result */}
-                    {resultUrl && (
+                    {currentState.resultUrl && (
                       <div className="space-y-4">
                         <div className="rounded-lg border border-primary/20 bg-primary/10 p-4">
                           <div className="flex items-center gap-3">
@@ -473,20 +556,42 @@ export function ImageSonification() {
                         <div className="rounded-lg border p-4">
                           <p className="mb-2 text-sm font-medium">Preview</p>
                           <img
-                            src={resultUrl}
+                            src={currentState.resultUrl}
                             alt="Reconstructed"
                             className="mx-auto max-h-64 rounded-lg object-contain"
                           />
                         </div>
 
-                        <Button
-                          className="w-full"
-                          size="lg"
-                          onClick={handleDownload}
-                        >
-                          <IconDownload className="h-4 w-4" />
-                          Download Image
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            size="lg"
+                            onClick={handleDownload}
+                          >
+                            <IconDownload className="h-4 w-4" />
+                            Download
+                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="outline" size="lg" onClick={handleShare}>
+                                <IconShare className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Share image</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="outline" size="lg" onClick={handleShareToTwitter}>
+                                <IconBrandX className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Share on X (Twitter)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -644,6 +749,7 @@ function UploadedFileView({
   mode,
   isProcessing,
   resultUrl,
+  resultBlob,
   resultInfo,
   quality,
   onQualityChange,
@@ -656,6 +762,7 @@ function UploadedFileView({
   mode: Mode
   isProcessing: boolean
   resultUrl: string | null
+  resultBlob: Blob | null
   resultInfo: { size?: string; duration?: string; dimensions?: string; compressionRatio?: string } | null
   quality?: QualityMode
   onQualityChange?: (quality: QualityMode) => void
@@ -675,6 +782,48 @@ function UploadedFileView({
       }
       setIsResultPlaying(!isResultPlaying);
     }
+  };
+
+  const handleShare = async () => {
+    if (!resultBlob) return
+
+    const fileName = mode === "image-to-wav"
+      ? `${file.name.split(".")[0] || "sonified"}.wav`
+      : `${file.name.split(".")[0] || "reconstructed"}.png`
+
+    const fileToShare = new File(
+      [resultBlob],
+      fileName,
+      { type: resultBlob.type }
+    )
+
+    if (navigator.share && navigator.canShare({ files: [fileToShare] })) {
+      try {
+        await navigator.share({
+          title: "Image Sonification",
+          text: mode === "image-to-wav"
+            ? "Check out this image converted to sound!"
+            : "Check out this image reconstructed from sound!",
+          files: [fileToShare],
+        })
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Share failed:", err)
+        }
+      }
+    } else {
+      // Fallback: copy link or show message
+      alert("Sharing is not supported on this device. Please use the download button.")
+    }
+  }
+
+  const handleShareToTwitter = () => {
+    const text = mode === "image-to-wav"
+      ? "Just converted an image to sound using Image Sonification! 🎵🖼️"
+      : "Just reconstructed an image from sound using Image Sonification! 🖼️🎵"
+    const url = "https://sonification.shiva.codes"
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
+    window.open(tweetUrl, "_blank", "noopener,noreferrer")
   };
   return (
     <div className="space-y-4">
@@ -844,7 +993,7 @@ function UploadedFileView({
                   barWidth={3}
                   barGap={2}
                   barRadius={1}
-                  barColor="hsl(var(--primary))"
+                  barColor="#e11d48"
                 />
               </div>
               <audio
@@ -869,10 +1018,32 @@ function UploadedFileView({
             </div>
           )}
 
-          <Button className="w-full" size="lg" onClick={onDownload}>
-            <IconDownload className="h-4 w-4" />
-            Download {mode === "image-to-wav" ? "WAV File" : "Image"}
-          </Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" size="lg" onClick={onDownload}>
+              <IconDownload className="h-4 w-4" />
+              Download
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="lg" onClick={handleShare}>
+                  <IconShare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Share {mode === "image-to-wav" ? "audio" : "image"}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="lg" onClick={handleShareToTwitter}>
+                  <IconBrandX className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Share on X (Twitter)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       )}
     </div>
