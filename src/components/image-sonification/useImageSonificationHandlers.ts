@@ -1,5 +1,6 @@
 import * as React from "react"
 import { imageToAudio, audioToImage, formatBytes, formatDuration, type QualityMode } from "@/services/sonification"
+import { fileToImage, imageToFile } from "@/services/file-image-conversion"
 import type { Mode, BulkState } from "./types"
 
 interface UseImageSonificationHandlersProps {
@@ -68,7 +69,7 @@ export function useImageSonificationHandlers({
                 : pf
             ),
           }))
-        } else {
+        } else if (mode === "wav-to-image") {
           const result = await audioToImage(file)
           
           setBulkState(prev => ({
@@ -84,6 +85,47 @@ export function useImageSonificationHandlers({
                       size: formatBytes(result.imageBlob.size),
                     },
                     status: "completed",
+                  }
+                : pf
+            ),
+          }))
+        } else if (mode === "file-to-image") {
+          const result = await fileToImage(file)
+          
+          setBulkState(prev => ({
+            ...prev,
+            processedFiles: prev.processedFiles.map((pf, idx) =>
+              idx === i
+                ? {
+                    ...pf,
+                    resultUrl: result.imageUrl,
+                    resultBlob: result.imageBlob,
+                    resultInfo: {
+                      dimensions: `${result.width} x ${result.height}`,
+                      size: formatBytes(result.imageBlob.size),
+                    },
+                    status: "completed",
+                  }
+                : pf
+            ),
+          }))
+        } else if (mode === "image-to-file") {
+          const result = await imageToFile(file)
+          
+          setBulkState(prev => ({
+            ...prev,
+            processedFiles: prev.processedFiles.map((pf, idx) =>
+              idx === i
+                ? {
+                    ...pf,
+                    resultUrl: result.fileUrl,
+                    resultBlob: result.fileBlob,
+                    resultInfo: {
+                      size: formatBytes(result.fileSize),
+                    },
+                    status: "completed",
+                    // Store the original filename for download
+                    originalFileName: result.fileName,
                   }
                 : pf
             ),
@@ -113,9 +155,20 @@ export function useImageSonificationHandlers({
         setTimeout(() => {
           const link = document.createElement("a")
           link.href = pf.resultUrl
-          link.download = mode === "image-to-wav"
-            ? `${pf.file.name.split(".")[0]}.wav`
-            : `${pf.file.name.split(".")[0]}.png`
+          
+          let filename: string
+          if (mode === "image-to-wav") {
+            filename = `${pf.file.name.split(".")[0]}.wav`
+          } else if (mode === "wav-to-image" || mode === "file-to-image") {
+            filename = `${pf.file.name.split(".")[0]}.png`
+          } else if (mode === "image-to-file") {
+            // Use the original filename from the decoded metadata
+            filename = pf.originalFileName || pf.file.name.replace(/\.(png|jpg|jpeg)$/i, '_decoded')
+          } else {
+            filename = pf.file.name
+          }
+          
+          link.download = filename
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)

@@ -29,19 +29,60 @@ export function FAQSection() {
                 </p>
               </AccordionContent>
             </AccordionItem>
+            
             <AccordionItem value="item-2">
+              <AccordionTrigger>
+                How does file-to-image conversion work?
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-muted-foreground">
+                  File-to-image conversion encodes a file’s binary data into a PNG by mapping bytes to RGB pixels and embedding metadata like the original filename.
+                  The image can be decoded to perfectly restore the original file.
+
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3">
+              <AccordionTrigger>
+                What file types can be converted to images?
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-muted-foreground">
+                  Any file type can be converted documents, executables, archives, code, and more.
+                   The process is fully lossless, so decoding returns the exact original file.
+
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4">
               <AccordionTrigger>
                 What image formats are supported?
               </AccordionTrigger>
               <AccordionContent>
                 <p className="text-muted-foreground">
-                  We support common image formats including PNG, JPG/JPEG,
-                  and WEBP. For best results, use images with clear contrast
-                  and reasonable file sizes (under 10MB recommended).
+                  For sonification: PNG, JPG/JPEG, and WEBP formats. 
+                  For file-to-image: output is always PNG for lossless encoding. 
+                  Best results with images under 10MB.
                 </p>
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-3">
+
+            <AccordionItem value="item-5">
+              <AccordionTrigger>
+                Can I decode any PNG image back to a file?
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-muted-foreground">
+                  No, only PNG images created using our File→Image converter can be decoded. 
+                  These contain special identification data. Regular photos won't work 
+                  for file reconstruction.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6">
               <AccordionTrigger>
                 Can I reconstruct any audio file to an image?
               </AccordionTrigger>
@@ -54,19 +95,34 @@ export function FAQSection() {
                 </p>
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-4">
+
+            <AccordionItem value="item-7">
               <AccordionTrigger>
                 Is my data stored on your servers?
               </AccordionTrigger>
               <AccordionContent>
                 <p className="text-muted-foreground">
-                  No, all processing happens locally in your browser. Your
-                  images and audio files are never uploaded to any server.
-                  This ensures complete privacy for your data.
+                  No, all processing happens locally in your browser. Your files are never 
+                  uploaded to any server. This ensures complete privacy for your data, 
+                  whether converting images to sound or files to images.
                 </p>
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-5">
+
+            <AccordionItem value="item-8">
+              <AccordionTrigger>
+                What are some use cases for file-to-image conversion?
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-muted-foreground">
+                  Useful for: storing files in image-only platforms, creating visual backups, 
+                  sharing files through image channels, data art projects, or representing 
+                  digital information visually.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-9">
               <AccordionTrigger>
                 Why does my reconstructed image look different?
               </AccordionTrigger>

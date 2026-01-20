@@ -75,7 +75,17 @@ export function BulkUploadView({
   const errorCount = processedFiles.filter(f => f.status === "error").length
 
   const isImageToWav = mode === "image-to-wav"
-  const fileExtension = isImageToWav ? "wav" : "png"
+  const isFileToImage = mode === "file-to-image"
+  const isImageToFile = mode === "image-to-file"
+  
+  const getFileExtension = () => {
+    if (isImageToWav) return "wav"
+    if (isFileToImage) return "png"
+    if (isImageToFile) return "bin" // Will be replaced with actual extension
+    return "png"
+  }
+  
+  const fileExtension = getFileExtension()
 
   return (
     <div className="space-y-4">
@@ -122,7 +132,7 @@ export function BulkUploadView({
                 </div>
               </div>
             )}
-            {pf.status === "completed" && pf.resultUrl && !isImageToWav && (
+            {pf.status === "completed" && pf.resultUrl && (mode === "wav-to-image" || mode === "file-to-image") && (
               <div 
                 className="relative group shrink-0 cursor-pointer"
                 onClick={() => handleImageClick(pf.resultUrl, pf.file.name)}
@@ -227,7 +237,20 @@ export function BulkUploadView({
                         onClick={() => {
                           const link = document.createElement("a")
                           link.href = pf.resultUrl
-                          link.download = `${pf.file.name.split(".")[0]}.${fileExtension}`
+                          
+                          let filename: string
+                          if (isImageToWav) {
+                            filename = `${pf.file.name.split(".")[0]}.wav`
+                          } else if (isFileToImage || mode === "wav-to-image") {
+                            filename = `${pf.file.name.split(".")[0]}.png`
+                          } else if (isImageToFile) {
+                            // Use original filename from decoded metadata
+                            filename = (pf as any).originalFileName || pf.file.name.replace(/\.(png|jpg|jpeg)$/i, '_decoded')
+                          } else {
+                            filename = `${pf.file.name.split(".")[0]}.${fileExtension}`
+                          }
+                          
+                          link.download = filename
                           document.body.appendChild(link)
                           link.click()
                           document.body.removeChild(link)

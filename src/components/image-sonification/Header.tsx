@@ -26,8 +26,8 @@ export function Header({ theme, onThemeChange, getThemeLabel }: HeaderProps) {
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl" style={{ fontFamily: "'Playfair Display', serif" }}>
           Image Sonification
         </h1>
-        <p className="mt-2 text-muted-foreground font-light" style={{ fontFamily: "'Playfair Display', serif" }}>
-          Convert images to sound and back again
+        <p className="mt-2 text-sm sm:text-base text-muted-foreground font-light" style={{ fontFamily: "'Playfair Display', serif" }}>
+          Convert images to sound, files to images, and back again
         </p>
       </div>
       <div className="flex items-center gap-2">

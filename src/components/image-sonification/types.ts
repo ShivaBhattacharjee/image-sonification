@@ -1,4 +1,4 @@
-export type Mode = "image-to-wav" | "wav-to-image"
+export type Mode = "image-to-wav" | "wav-to-image" | "file-to-image" | "image-to-file"
 
 export interface ProcessedFile {
   file: File
@@ -14,6 +14,7 @@ export interface ProcessedFile {
   }
   status: "processing" | "completed" | "error"
   error?: string
+  originalFileName?: string // For image-to-file conversion
 }
 
 export interface BulkState {
